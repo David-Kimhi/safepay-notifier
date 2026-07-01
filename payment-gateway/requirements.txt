@@ -3,3 +3,4 @@ uvicorn[standard]
 confluent-kafka
 pydantic
 redis
+prometheus-fastapi-instrumentator

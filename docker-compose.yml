@@ -7,6 +7,9 @@ services:
       ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
     ports:
       - "22181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
   kafka:
     healthcheck:
       test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
@@ -18,9 +21,12 @@ services:
     depends_on: [zookeeper]
     ports:
       - "${KAFKA_EXTERNAL_PORT}:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     environment:
       KAFKA_BROKER_ID: ${KAFKA_BROKER_ID}
       KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
       KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME}
@@ -67,8 +73,9 @@ services:
       - "${PAYMENT_GATEWAY_EXTERNAL_PORT}:8000"
     environment:
       - REDIS_HOST=redis
-      - REDIS_PROT=6379
+      - REDIS_PORT=6379
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_TOPIC=payments
     depends_on:
       kafka:
         condition: service_healthy
@@ -79,10 +86,87 @@ services:
     build: ./webhook-worker
     environment:
       - REDIS_HOST=redis
-      - REDIS_PROT=6379
+      - REDIS_PORT=6379
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_TOPIC=payments
+
+  bank-simulator:
+    build: ./bank-simulator
+    environment:
+      - GATEWAY_URL=http://payment-gateway:8000
+      - INITIAL_POPULATION=10000
+      - REAL_SECONDS_PER_SIM_HOUR=3
+      - NORMAL_P_DAY=0.015
+      - NORMAL_P_NIGHT=0.001
     depends_on:
-      kafka:
-        condition: service_healthy
-      redis:
+      payment-gateway:
         condition: service_started
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    privileged: true
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - "--docker_only=true"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    depends_on:
+      - cadvisor
+
+  loki:
+    image: grafana/loki:3.1.1
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:3.1.1
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_USERS_DEFAULT_THEME=light
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+
+volumes:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
+  prom_data:
+  loki_data:
+  grafana_data:

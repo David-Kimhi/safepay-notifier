@@ -27,7 +27,7 @@ conf = {
 }
 
 def process_payment(payment_data):
-    txn_id = payment_data.get('transaction_id')
+    txn_id = payment_data.get('gateway_transaction_id')
     amount = payment_data.get('amount')
     
     # 1. Idempotency Check
@@ -63,7 +63,7 @@ def process_payment(payment_data):
 
 def main():
     consumer = Consumer(conf)
-    topic = 'transactions'
+    topic = os.getenv('KAFKA_TOPIC', 'payments')
     consumer.subscribe([topic])
     logger.info("Worker started (Redis idempotency, manual commit)")
 

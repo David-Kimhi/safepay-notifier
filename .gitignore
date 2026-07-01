@@ -26,6 +26,10 @@ venv/
 # Logs
 logs/
 
+# Local notes
+TODO.md
+docs/
+
 # OS
 .DS_Store
 Thumbs.db
