@@ -69,7 +69,9 @@ def main():
 
     try:
         while True:
+            # sleep for 0.2 seconds to slow down the consumer (for simulation)
             time.sleep(0.2)
+            
             msg = consumer.poll(1.0)
 
             if msg is None:
