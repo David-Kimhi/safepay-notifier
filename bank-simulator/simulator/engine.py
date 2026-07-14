@@ -17,10 +17,12 @@ class SimulationEngine:
         pool: PopulationPool,
         clock: SimClock,
         gateway_url: str,
+        max_sim_days: int | None = None,
     ) -> None:
         self.pool = pool
         self.clock = clock
         self.gateway_url = gateway_url.rstrip("/")
+        self.max_sim_days = max_sim_days
         self._stop = asyncio.Event()
         self._day_stats = {"sent": 0, "ok": 0, "failed": 0}
 
@@ -59,10 +61,11 @@ class SimulationEngine:
 
     async def run(self) -> None:
         logger.info(
-            "Simulation started: pool=%s gateway=%s sec_per_hour=%s",
+            "Simulation started: pool=%s gateway=%s sec_per_hour=%s max_sim_days=%s",
             self.pool.size,
             self.gateway_url,
             self.clock.real_seconds_per_hour,
+            self.max_sim_days or "unlimited",
         )
 
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -80,5 +83,11 @@ class SimulationEngine:
                 day_ended = self.clock.advance()
                 if day_ended:
                     self._log_day_summary(tick.sim_day)
+                    if self.max_sim_days is not None and tick.sim_day >= self.max_sim_days:
+                        logger.info(
+                            "Reached MAX_SIM_DAYS=%s; stopping",
+                            self.max_sim_days,
+                        )
+                        self.request_stop()
 
         logger.info("Simulation stopped.")

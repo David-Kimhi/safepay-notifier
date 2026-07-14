@@ -26,14 +26,30 @@ def build_pool(initial_population: int) -> PopulationPool:
     return pool
 
 
+def _parse_max_sim_days(raw: str | None) -> int | None:
+    """Parse MAX_SIM_DAYS; empty/0/unset means unlimited."""
+    if raw is None or raw.strip() == "" or raw.strip() == "0":
+        return None
+    value = int(raw)
+    if value < 0:
+        raise ValueError("MAX_SIM_DAYS must be >= 0 (0 = unlimited)")
+    return value
+
+
 async def run_simulation(
     gateway_url: str,
     initial_population: int,
     seconds_per_hour: float,
+    max_sim_days: int | None,
 ) -> None:
     pool = build_pool(initial_population)
     clock = SimClock(real_seconds_per_hour=seconds_per_hour)
-    engine = SimulationEngine(pool=pool, clock=clock, gateway_url=gateway_url)
+    engine = SimulationEngine(
+        pool=pool,
+        clock=clock,
+        gateway_url=gateway_url,
+        max_sim_days=max_sim_days,
+    )
 
     loop = asyncio.get_running_loop()
     try:
@@ -65,13 +81,21 @@ def main() -> None:
         default=float(os.getenv("REAL_SECONDS_PER_SIM_HOUR", "3")),
         help="Real seconds per simulated hour",
     )
+    parser.add_argument(
+        "--max-days",
+        type=int,
+        default=_parse_max_sim_days(os.getenv("MAX_SIM_DAYS")),
+        help="Stop after N simulated days (0/omit = unlimited)",
+    )
     args = parser.parse_args()
+    max_sim_days = None if args.max_days is None or args.max_days == 0 else args.max_days
 
     asyncio.run(
         run_simulation(
             gateway_url=args.url,
             initial_population=args.population,
             seconds_per_hour=args.seconds_per_hour,
+            max_sim_days=max_sim_days,
         )
     )
 

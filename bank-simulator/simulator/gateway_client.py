@@ -18,11 +18,20 @@ async def send_payment(
     try:
         resp = await client.post(f"{url}/pay", json=payload, headers=headers)
         latency = time.perf_counter() - start
-        return {
+        
+        # Build the return value
+        return_value = {
             "ok": resp.status_code < 400,
             "status": resp.status_code,
             "latency": latency,
         }
+        
+        # Add error message if there is an error
+        if resp.status_code >= 400:
+            logger.warning("pay failed %s: %s", resp.status_code, resp.text)
+            return_value["error"] = resp.text
+            
+        return return_value
     except Exception as exc:
         latency = time.perf_counter() - start
         return {

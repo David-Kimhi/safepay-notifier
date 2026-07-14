@@ -52,6 +52,7 @@ Use a smaller `--population` for quick local tests.
 | `GATEWAY_URL` | `http://localhost:8000` | Payment gateway base URL |
 | `INITIAL_POPULATION` | `10000` | Normal users added at startup |
 | `REAL_SECONDS_PER_SIM_HOUR` | `3` | Real seconds per simulated hour |
+| `MAX_SIM_DAYS` | `0` | Stop after N simulated days (`0` = unlimited) |
 | `NORMAL_P_DAY` | `0.015` | Per-user purchase probability per daytime hour |
 | `NORMAL_P_NIGHT` | `0.001` | Per-user purchase probability per night hour |
 

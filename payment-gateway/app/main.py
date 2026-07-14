@@ -87,7 +87,7 @@ async def process_payment(
         resp = PaymentResponse(status="accepted", gateway_transaction_id=payment_data['gateway_transaction_id'])
         
         # Idempotency check
-        redis_key = f"idempotency:{idempotency_key}"
+        redis_key = f"producer:{idempotency_key}"
         redis_resp = redis_client.set(
             redis_key,
             json.dumps(resp.model_dump()),
