@@ -6,6 +6,7 @@ import uuid
 from app.services.redis_service import get_redis_client, ping_redis
 from app.services.logging_config import setup_logging
 from app.services.kafka_config import get_kafka_producer, get_kafka_topic
+from app.services.db import get_connection
 from prometheus_fastapi_instrumentator import Instrumentator
 
 import os
@@ -46,7 +47,7 @@ class PaymentRequest(BaseModel):
 class PaymentResponse(BaseModel):
     status: str
     gateway_transaction_id: str
-    
+    idempotency_key: str
 
 
 # Endpoint
@@ -84,7 +85,7 @@ async def process_payment(
     
     try:
         
-        resp = PaymentResponse(status="accepted", gateway_transaction_id=payment_data['gateway_transaction_id'])
+        resp = PaymentResponse(status="accepted", gateway_transaction_id=payment_data['gateway_transaction_id'], idempotency_key=idempotency_key)
         
         # Idempotency check
         redis_key = f"producer:{idempotency_key}"
@@ -112,12 +113,12 @@ async def process_payment(
         if not result["ok"]:
             logger.error("Message delivery failed: %s", result["error"])
 
-            failed = PaymentResponse(status="failed", gateway_transaction_id=payment_data['gateway_transaction_id'])
+            failed = PaymentResponse(status="failed", gateway_transaction_id=payment_data['gateway_transaction_id'], idempotency_key=idempotency_key)
             redis_client.set(redis_key, failed.model_dump_json(), ex=3*60*60)
             response.status_code = 500
             return failed
         
-        queued = PaymentResponse(status="queued", gateway_transaction_id=payment_data['gateway_transaction_id'])
+        queued = PaymentResponse(status="queued", gateway_transaction_id=payment_data['gateway_transaction_id'], idempotency_key=idempotency_key)
         redis_client.set(redis_key, queued.model_dump_json(), ex=3*60*60)
         response.status_code = 202
 
@@ -128,3 +129,50 @@ async def process_payment(
     except Exception as e:
         logger.exception("Failed to process payment request: %s\nGateway Transaction ID: %s", e, payment_data['gateway_transaction_id'])
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/status")
+async def get_status(
+    source_account_id: str,
+    x_idempotency_key: str = Header(..., alias="Idempotency-Key")
+):
+    """
+    Look up the latest known status for a payment by its idempotency key.
+    Reads Redis only: consumer:{key} (final worker/Postgres outcome) first,
+    then producer:{key} (in-flight gateway status). No Postgres fallback.
+    """
+    idempotency_key = f"{source_account_id}:{x_idempotency_key}"
+
+    final = redis_client.get(f"consumer:{idempotency_key}")
+    if final is not None:
+        return json.loads(final)
+
+    in_flight = redis_client.get(f"producer:{idempotency_key}")
+    if in_flight is not None:
+        return json.loads(in_flight)
+
+    raise HTTPException(status_code=404, detail="unknown or expired idempotency key")
+
+
+@app.get("/balance/{account_id}")
+async def get_balance(account_id: str, currency: str):
+    """Return the account balance in cents, from Redis cache or Postgres fallback."""
+    cached = redis_client.get(f"balance:{account_id}:{currency}")
+    if cached is not None:
+        return {"account_id": account_id, "currency": currency, "balance_cents": int(cached), "source": "cache"}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT balance_cents FROM account_balances WHERE account_id = %s AND currency = %s",
+                (account_id, currency),
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="account not found")
+
+    return {"account_id": account_id, "currency": currency, "balance_cents": int(row[0]), "source": "postgres"}

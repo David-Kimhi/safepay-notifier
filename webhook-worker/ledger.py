@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from db import get_connection
+import balance_cache
 
 OPENING_BALANCE_CENTS = int(os.getenv("OPENING_BALANCE_CENTS", "100000"))
 
@@ -109,6 +110,23 @@ def _get_balance_cents(cur, account_id: str, currency: str) -> int:
     return int(row[0]) if row else 0
 
 
+def precheck_cached_balance(payment_data: dict) -> str | None:
+    """Check the cached source balance only — never touches Postgres.
+
+    This is purely informational: it never approves and it never skips
+    settle_payment(), which remains the sole authority. Callers may use the
+    returned reason to surface an early, non-authoritative status (e.g. to a
+    polling client) while the real settlement is still in flight.
+    Returns a reason string if the cache clearly shows insufficient funds,
+    else None (cache miss or apparently-sufficient balance).
+    """
+    source_id = payment_data["source_account_id"]
+    currency = payment_data["currency"]
+    amount_cents = float_amount_to_cents(payment_data["amount"])
+
+    return balance_cache.is_cached_insufficient(source_id, currency, amount_cents)
+
+
 def settle_payment(payment_data: dict) -> tuple[str, str | None]:
     """Settle one payment in Postgres: pending → approved or rejected with ledger entries."""
     required = (
@@ -181,6 +199,13 @@ def settle_payment(payment_data: dict) -> tuple[str, str | None]:
                 )
                 txn_id = cur.fetchone()[0]
 
+                # Lock source account row to serialize concurrent debits
+                cur.execute(
+                    "SELECT 1 FROM accounts WHERE account_id = %s FOR UPDATE",
+                    (source_id,),
+                )
+
+                # Check balance and reject if insufficient funds
                 balance = _get_balance_cents(cur, source_id, currency)
                 if balance < amount_cents:
                     reason = f"insufficient funds: balance={balance} need={amount_cents}"
@@ -194,6 +219,7 @@ def settle_payment(payment_data: dict) -> tuple[str, str | None]:
                     )
                     return "rejected", reason
 
+                # Create double-entry ledger entries
                 cur.execute(
                     """
                     INSERT INTO ledger_entries (transaction_id, account_id, entry_type, amount_cents)
@@ -201,6 +227,8 @@ def settle_payment(payment_data: dict) -> tuple[str, str | None]:
                     """,
                     (txn_id, source_id, amount_cents, txn_id, dest_id, amount_cents),
                 )
+                
+                # Mark transaction as approved
                 cur.execute(
                     """
                     UPDATE transactions
@@ -209,6 +237,12 @@ def settle_payment(payment_data: dict) -> tuple[str, str | None]:
                     """,
                     (txn_id,),
                 )
+
+                # Refresh balance cache used by the pre-check above and by
+                # the gateway's balance endpoint: debit source, credit dest
+                balance_cache.debit(source_id, currency, balance, amount_cents)
+                balance_cache.credit(dest_id, currency, amount_cents)
                 return "approved", None
     finally:
+        # Close the connection
         conn.close()

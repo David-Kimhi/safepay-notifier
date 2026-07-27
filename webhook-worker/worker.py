@@ -7,7 +7,7 @@ import redis
 from confluent_kafka import Consumer
 
 from logging_config import setup_logging
-from ledger import settle_payment
+from ledger import settle_payment, precheck_cached_balance
 
 logger = setup_logging()
 
@@ -41,15 +41,25 @@ def process_payment(payment_data):
 
     logger.info("Processing %s ($%s)...", txn_id, amount)
 
+    # Give a polling client an early, non-authoritative signal while Postgres
+    # settlement is still in flight. This never skips settle_payment below.
+    preliminary_reason = precheck_cached_balance(payment_data)
+    if preliminary_reason:
+        redis_client.set(
+            redis_key,
+            json.dumps({"status": "processing", "preliminary_reason": preliminary_reason}),
+            ex=3600,
+        )
+
     try:
         status, reason = settle_payment(payment_data)
 
         if status == "duplicate":
             logger.info("Skipping %s (already in Postgres)", txn_id)
-            redis_client.set(redis_key, "processed", ex=3600)
+            redis_client.set(redis_key, json.dumps({"status": "processed", "reason": reason}), ex=3600)
             return True
 
-        redis_client.set(redis_key, status, ex=3600)
+        redis_client.set(redis_key, json.dumps({"status": status, "reason": reason}), ex=3600)
         if status == "approved":
             logger.info("Approved: %s", txn_id)
         else:
@@ -69,8 +79,6 @@ def main():
 
     try:
         while True:
-            # sleep for 0.2 seconds to slow down the consumer (for simulation)
-            time.sleep(0.2)
             
             msg = consumer.poll(1.0)
 
