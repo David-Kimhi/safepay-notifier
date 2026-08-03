@@ -84,6 +84,7 @@ Config files in this folder:
 | `loki/loki-config.yml` | Where Loki stores logs |
 | `promtail/promtail-config.yml` | How logs get from Docker to Loki |
 | `grafana/provisioning/datasources/datasources.yml` | Auto-connects Grafana to Prometheus and Loki |
+| `grafana/provisioning/dashboards/json/safepay-overview.json` | Auto-loaded "SafePay Overview" dashboard (consumed/approved/rejected/failed counts, `/pay` latency, error + rejection-reason logs) |
 
 ---
 

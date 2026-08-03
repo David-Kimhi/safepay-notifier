@@ -39,7 +39,7 @@ def startup():
 class PaymentRequest(BaseModel):
     source_account_id: str
     destination_account_id: str
-    amount: float
+    amount_cents: int
     currency: str
     payment_type: str
     timestamp: str

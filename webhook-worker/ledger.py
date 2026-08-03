@@ -2,17 +2,11 @@
 
 import os
 from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
 
 from db import get_connection
 import balance_cache
 
 OPENING_BALANCE_CENTS = int(os.getenv("OPENING_BALANCE_CENTS", "100000"))
-
-
-def float_amount_to_cents(amount) -> int:
-    """Convert gateway float amount to integer cents (half-up rounding)."""
-    return int(Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100)
 
 
 def _account_type(account_id: str) -> str:
@@ -122,7 +116,7 @@ def precheck_cached_balance(payment_data: dict) -> str | None:
     """
     source_id = payment_data["source_account_id"]
     currency = payment_data["currency"]
-    amount_cents = float_amount_to_cents(payment_data["amount"])
+    amount_cents = payment_data["amount_cents"]
 
     return balance_cache.is_cached_insufficient(source_id, currency, amount_cents)
 
@@ -134,7 +128,7 @@ def settle_payment(payment_data: dict) -> tuple[str, str | None]:
         "gateway_transaction_id",
         "source_account_id",
         "destination_account_id",
-        "amount",
+        "amount_cents",
         "currency",
         "payment_type",
     )
@@ -147,7 +141,7 @@ def settle_payment(payment_data: dict) -> tuple[str, str | None]:
     source_id = payment_data["source_account_id"]
     dest_id = payment_data["destination_account_id"]
     currency = payment_data["currency"]
-    amount_cents = float_amount_to_cents(payment_data["amount"])
+    amount_cents = payment_data["amount_cents"]
     payment_type = payment_data["payment_type"]
     source_ts = _parse_timestamp(payment_data.get("source_account_timestamp"))
     gateway_ts = _parse_timestamp(payment_data.get("gateway_received_timestamp"))

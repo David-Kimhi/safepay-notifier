@@ -31,7 +31,7 @@ conf = {
 def process_payment(payment_data):
     """Handle one Kafka payment message; return True if safe to commit offset."""
     txn_id = payment_data.get('gateway_transaction_id')
-    amount = payment_data.get('amount')
+    amount_cents = payment_data.get('amount_cents')
     redis_key = f"consumer:{payment_data.get('idempotency_key')}"
 
     # 1. Idempotency Check
@@ -39,7 +39,7 @@ def process_payment(payment_data):
         logger.info("Skipping %s (already processed)", txn_id)
         return True
 
-    logger.info("Processing %s ($%s)...", txn_id, amount)
+    logger.info("Processing %s (%s cents)...", txn_id, amount_cents)
 
     # Give a polling client an early, non-authoritative signal while Postgres
     # settlement is still in flight. This never skips settle_payment below.

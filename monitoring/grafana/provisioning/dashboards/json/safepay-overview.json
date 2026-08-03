@@ -1,0 +1,164 @@
+{
+  "id": null,
+  "uid": "safepay-overview",
+  "title": "SafePay Overview",
+  "editable": true,
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "tags": ["safepay"],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Messages Consumed",
+      "datasource": "Loki",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "refId": "A",
+          "expr": "sum(count_over_time({container=~\".*webhook-worker.*\"} |= \"Processing\" [$__interval]))",
+          "legendFormat": "consumed"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Approved Transactions",
+      "datasource": "Loki",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "refId": "A",
+          "expr": "sum(count_over_time({container=~\".*webhook-worker.*\"} |= \"Approved:\" [$__interval]))",
+          "legendFormat": "approved"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Rejected Transactions",
+      "datasource": "Loki",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "refId": "A",
+          "expr": "sum(count_over_time({container=~\".*webhook-worker.*\"} |= \"Rejected:\" [$__interval]))",
+          "legendFormat": "rejected"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Failed / Critical Transactions",
+      "datasource": "Loki",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "refId": "A",
+          "expr": "sum(count_over_time({container=~\".*webhook-worker.*\"} |= \"Critical failure\" [$__interval]))",
+          "legendFormat": "failed"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "/pay API Duration (p50 / p95 / p99)",
+      "description": "Overall time from receiving a /pay request to responding (start to finish of the API call), from the gateway's Prometheus instrumentation.",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{handler=\"/pay\"}[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "datasource": "Prometheus",
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{handler=\"/pay\"}[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "datasource": "Prometheus",
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{handler=\"/pay\"}[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "/pay API Duration (average)",
+      "description": "Average end-to-end /pay request duration: rate(sum)/rate(count) of the Prometheus histogram.",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "refId": "A",
+          "expr": "rate(http_request_duration_seconds_sum{handler=\"/pay\"}[5m]) / rate(http_request_duration_seconds_count{handler=\"/pay\"}[5m])",
+          "legendFormat": "avg"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "Recent Errors",
+      "datasource": "Loki",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "refId": "A",
+          "expr": "{container=~\".*(webhook-worker|payment-gateway).*\"} |= \"ERROR\""
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "Rejection Reasons",
+      "datasource": "Loki",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "refId": "A",
+          "expr": "{container=~\".*webhook-worker.*\"} |= \"Rejected:\""
+        }
+      ]
+    }
+  ]
+}

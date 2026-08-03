@@ -27,7 +27,7 @@ def build_payment() -> dict:
     return {
         "source_account_id": f"user_id_{random.randint(0, 10_000)}",
         "destination_account_id": random.choice(MERCHANTS),
-        "amount": round(random.uniform(0, 6_000), 2),
+        "amount_cents": random.randint(0, 600_000),
         "currency": random.choice(CURRENCIES),
         "payment_type": "purchase",
         "timestamp": datetime.now(timezone.utc).isoformat(),

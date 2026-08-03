@@ -26,11 +26,11 @@
 
 | Path | Role |
 |------|------|
-| `payment-gateway/` | FastAPI API, `/pay`, `/metrics` |
-| `webhook-worker/` | Kafka consumer, Postgres ledger settlement |
+| `payment-gateway/` | FastAPI API, `/pay`, `/status`, `/balance/{account_id}`, `/metrics` |
+| `webhook-worker/` | Kafka consumer, Postgres ledger settlement, Redis balance cache + reconciler |
 | `bank-simulator/` | Day/night population simulator |
 | `postgres/` | Schema init + `psql.sh` helper |
-| `scripts/` | Demo helpers (e.g. `reset-storage.sh`) |
+| `scripts/` | Demo helpers (`start.sh`, `reset-storage.sh`) |
 | `load-test/` | Fixed-RPS load tool (`simulate.py`) |
 | `monitoring/` | Prometheus, Grafana, Loki configs |
 | `docker-compose.yml` | Full local stack |
@@ -38,7 +38,14 @@
 ## Run the demo
 
 ```bash
-# Full stack (apps + monitoring + simulator)
+# Recommended: starts infra + monitoring, waits for Postgres/Redis/Grafana,
+# then the apps + simulator, and opens the Grafana dashboards in your browser.
+./scripts/start.sh
+
+# Same, but wipes Postgres tables + Redis first (clean slate)
+./scripts/start.sh --fresh
+
+# Or the plain equivalent (no waits, no auto-open, no fresh option)
 docker compose up -d --build
 
 # Finite sim run (e.g. 10 simulated days; ~12 min at 3s/sim-hour)
@@ -96,7 +103,8 @@ Details: [bank-simulator/README.md](bank-simulator/README.md).
 - [x] Load test script
 - [x] Bank population simulator (normal persona, `MAX_SIM_DAYS`)
 - [x] Postgres schema + worker ledger settle (approve / reject)
-- [ ] Redis atomic balance check + holds (hot path)
+- [x] Redis balance cache (pre-check, debit/credit, periodic reconciliation)
+- [x] Cents (`BIGINT`) everywhere — no floats in API, worker, or DB
 - [ ] Dead letter queue for failed payments
 - [ ] Heavy user + attacker personas
 - [ ] CI (GitHub Actions)

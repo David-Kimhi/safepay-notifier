@@ -75,7 +75,7 @@ def valid_payment():
     return {
         "source_account_id": "acct_user_1",
         "destination_account_id": "acct_merchant_1",
-        "amount": 100.0,
+        "amount_cents": 10000,
         "currency": "ILS",
         "payment_type": "purchase",
         "timestamp": "2026-06-27T10:00:00Z",
