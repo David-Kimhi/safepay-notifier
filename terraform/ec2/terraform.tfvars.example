@@ -1,0 +1,14 @@
+aws_region                = "us-east-1"
+ami_id                    = "ami-0123456789abcdef0"
+subnet_id                 = "subnet-0123456789abcdef0"
+iam_instance_profile_name = "safepay-lab-ec2"
+
+security_group_ids = {
+  kafka    = ["sg-0123456789abcdef0"]
+  postgres = ["sg-0123456789abcdef1"]
+  redis    = ["sg-0123456789abcdef2"]
+  gateway  = ["sg-0123456789abcdef3"]
+  worker   = ["sg-0123456789abcdef4"]
+  load     = ["sg-0123456789abcdef5"]
+  monitor  = ["sg-0123456789abcdef6"]
+}
