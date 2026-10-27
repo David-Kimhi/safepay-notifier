@@ -31,7 +31,7 @@ class NormalPersona:
         return {
             "source_account_id": user.user_id,
             "destination_account_id": user.merchant_affinity,
-            "amount": round(random.uniform(10, 500), 2),
+            "amount_cents": random.randint(1000, 50_000),
             "currency": random.choice(CURRENCIES),
             "payment_type": "purchase",
             "timestamp": datetime.now(timezone.utc).isoformat(),

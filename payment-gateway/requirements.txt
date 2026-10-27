@@ -4,3 +4,4 @@ confluent-kafka
 pydantic
 redis
 prometheus-fastapi-instrumentator
+psycopg2-binary

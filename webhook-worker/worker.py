@@ -7,7 +7,7 @@ import redis
 from confluent_kafka import Consumer
 
 from logging_config import setup_logging
-from ledger import settle_payment
+from ledger import settle_payment, precheck_cached_balance
 
 logger = setup_logging()
 
@@ -31,7 +31,7 @@ conf = {
 def process_payment(payment_data):
     """Handle one Kafka payment message; return True if safe to commit offset."""
     txn_id = payment_data.get('gateway_transaction_id')
-    amount = payment_data.get('amount')
+    amount_cents = payment_data.get('amount_cents')
     redis_key = f"consumer:{payment_data.get('idempotency_key')}"
 
     # 1. Idempotency Check
@@ -39,17 +39,27 @@ def process_payment(payment_data):
         logger.info("Skipping %s (already processed)", txn_id)
         return True
 
-    logger.info("Processing %s ($%s)...", txn_id, amount)
+    logger.info("Processing %s (%s cents)...", txn_id, amount_cents)
+
+    # Give a polling client an early, non-authoritative signal while Postgres
+    # settlement is still in flight. This never skips settle_payment below.
+    preliminary_reason = precheck_cached_balance(payment_data)
+    if preliminary_reason:
+        redis_client.set(
+            redis_key,
+            json.dumps({"status": "processing", "preliminary_reason": preliminary_reason}),
+            ex=3600,
+        )
 
     try:
         status, reason = settle_payment(payment_data)
 
         if status == "duplicate":
             logger.info("Skipping %s (already in Postgres)", txn_id)
-            redis_client.set(redis_key, "processed", ex=3600)
+            redis_client.set(redis_key, json.dumps({"status": "processed", "reason": reason}), ex=3600)
             return True
 
-        redis_client.set(redis_key, status, ex=3600)
+        redis_client.set(redis_key, json.dumps({"status": status, "reason": reason}), ex=3600)
         if status == "approved":
             logger.info("Approved: %s", txn_id)
         else:
@@ -69,8 +79,6 @@ def main():
 
     try:
         while True:
-            # sleep for 0.2 seconds to slow down the consumer (for simulation)
-            time.sleep(0.2)
             
             msg = consumer.poll(1.0)
 

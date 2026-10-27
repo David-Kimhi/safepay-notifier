@@ -17,7 +17,7 @@ def test_pay_missing_idempotency_key_422(client):
 
 def test_pay_invalid_body_422(client):
     payload = valid_payment()
-    del payload["amount"]
+    del payload["amount_cents"]
     resp = client.post("/pay", json=payload, headers=idem_headers())
     assert resp.status_code == 422
 

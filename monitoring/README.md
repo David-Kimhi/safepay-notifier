@@ -15,36 +15,37 @@ Open **Grafana** in your browser to see everything in one place.
 ## Architecture
 
 ```mermaid
-flowchart TD
-    subgraph apps [App containers]
-        PG[payment-gateway]
-        K[kafka]
-        R[redis]
-        Others[zookeeper / worker / ...]
-    end
-
-    CA[cAdvisor]
-    PT[Promtail]
-    PROM[Prometheus]
-    LOKI[Loki]
-    GRAF[Grafana]
-
-    apps -->|CPU, memory, network| CA
-    PG -->|request count, latency, errors| PROM
-    apps -->|stdout logs| PT
-
-    CA --> PROM
-    PT --> LOKI
-
-    PROM --> GRAF
-    LOKI --> GRAF
-    GRAF --> Browser[You in the browser]
+flowchart LR
+    S[Simulator] --> G[Gateway]
+    G --> K[Kafka]
+    K --> W[Worker]
+    W --> P[(Postgres)]
+    W --> R[(Redis balance cache)]
+    G -->|read status + balance| R
+    G -->|balance on cache miss| P
+    J[Balance reconciler] --> P
+    J --> R
+    G --> O[Prometheus and Loki]
+    W --> O
+    O --> F[Grafana]
 ```
 
-**Two paths, one screen:**
+Simple view of what happens:
 
-- **Numbers** → cAdvisor + app `/metrics` → Prometheus → Grafana (graphs)
-- **Logs** → Promtail → Loki → Grafana (log search)
+1. Simulator sends payments to Gateway.
+2. Gateway writes events to Kafka.
+3. Worker consumes from Kafka, settles in Postgres, and updates Redis balance cache.
+4. Gateway serves status and balance fast from Redis, with Postgres fallback for balance misses.
+5. Balance reconciler periodically refreshes Redis balances from Postgres.
+6. Gateway metrics + service logs go to Prometheus/Loki, then Grafana.
+
+Default Grafana dashboard on first run:
+
+- SafePay Overview
+- Messages consumed
+- Approved, rejected, and failed transaction counts
+- Pay endpoint latency (p50, p95, p99, average)
+- Recent errors and rejection reasons
 
 Grafana only **displays** data. It does not collect or store it.
 
@@ -84,6 +85,7 @@ Config files in this folder:
 | `loki/loki-config.yml` | Where Loki stores logs |
 | `promtail/promtail-config.yml` | How logs get from Docker to Loki |
 | `grafana/provisioning/datasources/datasources.yml` | Auto-connects Grafana to Prometheus and Loki |
+| `grafana/provisioning/dashboards/json/safepay-overview.json` | Auto-loaded "SafePay Overview" dashboard (consumed/approved/rejected/failed counts, `/pay` latency, error + rejection-reason logs) |
 
 ---
 
