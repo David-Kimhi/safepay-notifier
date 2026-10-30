@@ -31,6 +31,8 @@
 | `bank-simulator/` | Day/night population simulator |
 | `postgres/` | Schema init + `psql.sh` helper |
 | `scripts/` | Demo helpers (`start.sh`, `reset-storage.sh`) |
+| `scripts/aws/` | AWS lab helpers: list/start/stop EC2 instances ([README](scripts/aws/README.md)) |
+| `terraform/ec2/` | Terraform for the EC2 lab ([README](terraform/ec2/README.md)) |
 | `load-test/` | Fixed-RPS load tool (`simulate.py`) |
 | `monitoring/` | Prometheus, Grafana, Loki configs |
 | `docker-compose.yml` | Full local stack |

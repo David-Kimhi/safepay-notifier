@@ -36,6 +36,19 @@ output carefully. Run `terraform apply` only when you are ready to launch and
 begin incurring charges. Terraform writes private and public IPs after apply;
 use the private IPs for service connections.
 
+## Start, stop, and tear down
+
+Power state is controlled by the `instances_state` variable (`running` by
+default). Stopping ends compute billing, but the EBS volumes still bill:
+
+```sh
+terraform apply -var="instances_state=stopped"
+terraform apply -var="instances_state=running"
+```
+
+Helper scripts for listing, stopping, and starting instances through the AWS CLI
+are in [scripts/aws/](../../scripts/aws/README.md).
+
 ## Tear down
 
 Run `terraform destroy` to terminate only the EC2 instances managed by this

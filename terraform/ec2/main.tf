@@ -63,3 +63,12 @@ resource "aws_instance" "lab" {
     Component = each.key
   }
 }
+
+# Controls power state only. Instances are always launched running, so with
+# "stopped" they are created and then stopped right after.
+resource "aws_ec2_instance_state" "lab" {
+  for_each = aws_instance.lab
+
+  instance_id = each.value.id
+  state       = var.instances_state
+}

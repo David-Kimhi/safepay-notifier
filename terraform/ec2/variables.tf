@@ -30,3 +30,14 @@ variable "security_group_ids" {
     error_message = "Provide at least one existing security group ID for each role: kafka, postgres, redis, gateway, worker, load, and monitor."
   }
 }
+
+variable "instances_state" {
+  description = "Desired power state of all lab instances: running or stopped."
+  type        = string
+  default     = "running"
+
+  validation {
+    condition     = contains(["running", "stopped"], var.instances_state)
+    error_message = "instances_state must be either \"running\" or \"stopped\"."
+  }
+}
