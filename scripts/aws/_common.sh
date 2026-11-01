@@ -8,6 +8,9 @@
 
 set -euo pipefail
 
+# Never open the AWS CLI's interactive pager (it would hang scripts on long output).
+export AWS_PAGER=""
+
 PROJECT_TAG="${PROJECT_TAG:-safepay-lab}"
 
 require_aws_cli() {
