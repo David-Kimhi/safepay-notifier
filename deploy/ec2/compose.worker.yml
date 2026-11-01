@@ -1,0 +1,25 @@
+x-worker-env: &worker-env
+  REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required}
+  REDIS_PORT: 6379
+  POSTGRES_HOST: ${POSTGRES_HOST:?POSTGRES_HOST is required}
+  POSTGRES_PORT: 5432
+  POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+  POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+
+services:
+  webhook-worker:
+    build: ../../webhook-worker
+    restart: unless-stopped
+    environment:
+      <<: *worker-env
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_HOST:?KAFKA_HOST is required}:9092
+      KAFKA_TOPIC: payments
+
+  balance-reconciler:
+    build: ../../webhook-worker
+    restart: unless-stopped
+    command: ["python", "reconcile_balances.py"]
+    environment:
+      <<: *worker-env
+      RECONCILE_INTERVAL_SECONDS: 60

@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # "payment-gateway" resolves to the gateway instance's private IP through
+  # extra_hosts in deploy/ec2/compose.monitor.yml.
+  - job_name: payment-gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["payment-gateway:8000"]

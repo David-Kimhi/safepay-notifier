@@ -36,3 +36,66 @@ lab_instance_ids() {
     --query 'Reservations[].Instances[].InstanceId' \
     --output text
 }
+
+# Print "<instance-id> <private-ip>" of the running instance for a component.
+# Usage: lab_running_instance <component>
+lab_running_instance() {
+  local component="$1"
+  local result
+
+  result="$(aws ec2 describe-instances \
+    --filters "Name=tag:Project,Values=${PROJECT_TAG}" \
+              "Name=tag:Component,Values=${component}" \
+              "Name=instance-state-name,Values=running" \
+    --query 'Reservations[0].Instances[0].[InstanceId,PrivateIpAddress]' \
+    --output text)"
+
+  if [[ -z "${result}" || "${result}" == "None"* ]]; then
+    echo "error: no running instance with Component=${component}" >&2
+    return 1
+  fi
+  echo "${result}"
+}
+
+# Run a shell command on an instance through SSM and stream its output.
+# The command must not contain double quotes or backslashes (it is embedded in JSON).
+# Returns non-zero if the command fails.
+# Usage: ssm_run <instance-id> <command>
+ssm_run() {
+  local instance_id="$1"
+  local command="$2"
+  local command_id status
+  local attempts=0
+
+  command_id="$(aws ssm send-command \
+    --instance-ids "${instance_id}" \
+    --document-name AWS-RunShellScript \
+    --timeout-seconds 1800 \
+    --parameters "{\"commands\":[\"${command}\"]}" \
+    --query Command.CommandId --output text)"
+
+  while true; do
+    status="$(aws ssm get-command-invocation \
+      --command-id "${command_id}" --instance-id "${instance_id}" \
+      --query Status --output text 2>/dev/null || echo Pending)"
+    case "${status}" in
+      Pending|InProgress|Delayed) ;;
+      *) break ;;
+    esac
+    attempts=$((attempts + 1))
+    if [[ "${attempts}" -gt 600 ]]; then
+      echo "error: timed out waiting for SSM command ${command_id}" >&2
+      return 1
+    fi
+    sleep 3
+  done
+
+  aws ssm get-command-invocation \
+    --command-id "${command_id}" --instance-id "${instance_id}" \
+    --query StandardOutputContent --output text
+  aws ssm get-command-invocation \
+    --command-id "${command_id}" --instance-id "${instance_id}" \
+    --query StandardErrorContent --output text >&2
+
+  [[ "${status}" == "Success" ]]
+}

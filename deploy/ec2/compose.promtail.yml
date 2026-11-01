@@ -1,0 +1,17 @@
+# Optional log shipper for non-monitor roles. Add it to a role's compose file with
+# `-f compose.promtail.yml` (deploy.sh does this when WITH_PROMTAIL=1).
+# Requires the monitor security group to allow TCP 3100 from the role's group.
+services:
+  promtail:
+    image: grafana/promtail:3.1.1
+    restart: unless-stopped
+    command:
+      - "-config.file=/etc/promtail/promtail-config.yml"
+      - "-config.expand-env=true"
+    environment:
+      ROLE: ${ROLE:?ROLE is required}
+      LOKI_URL: http://${MONITOR_HOST:?MONITOR_HOST is required}:3100
+    volumes:
+      - ../../monitoring/promtail/promtail-ec2.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro

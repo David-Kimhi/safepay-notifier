@@ -1,0 +1,11 @@
+services:
+  bank-simulator:
+    build: ../../bank-simulator
+    restart: unless-stopped
+    environment:
+      GATEWAY_URL: http://${GATEWAY_HOST:?GATEWAY_HOST is required}:8000
+      INITIAL_POPULATION: ${INITIAL_POPULATION:-10000}
+      REAL_SECONDS_PER_SIM_HOUR: ${REAL_SECONDS_PER_SIM_HOUR:-3}
+      MAX_SIM_DAYS: ${MAX_SIM_DAYS:-0}
+      NORMAL_P_DAY: ${NORMAL_P_DAY:-0.015}
+      NORMAL_P_NIGHT: ${NORMAL_P_NIGHT:-0.001}

@@ -17,6 +17,8 @@ export AWS_REGION=eu-north-1
 | `list-instances.sh` | Lists lab instances with component, ID, state, type, and private/public IPs. | `./scripts/aws/list-instances.sh` |
 | `stop-instances.sh [component]` | Stops running instances and waits until they are stopped. Compute billing stops; EBS disks keep billing. | `./scripts/aws/stop-instances.sh` |
 | `start-instances.sh [component]` | Starts stopped instances, waits until they are running, then lists the new IPs. | `./scripts/aws/start-instances.sh kafka` |
+| `bootstrap-instances.sh [role...]` | One-time setup over SSM: installs Docker and git and clones the repo to `/opt/safepay`. Safe to re-run. | `./scripts/aws/bootstrap-instances.sh` |
+| `deploy.sh [role...]` | Looks up private IPs from EC2 tags, then updates each instance to `GIT_REF` and runs its compose file from [deploy/ec2](../../deploy/ec2/README.md). | `GIT_REF=main ./scripts/aws/deploy.sh gateway` |
 
 `component` is one of `kafka`, `postgres`, `redis`, `gateway`, `worker`, `load`,
 `monitor`. Omit it to act on all instances.
@@ -42,6 +44,8 @@ again.
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PROJECT_TAG` | `safepay-lab` | `Project` tag value used to find lab instances. |
+| `GIT_REF` | `main` | Branch or tag that `deploy.sh` checks out on the instances. |
+| `WITH_PROMTAIL` | `0` | `1` makes `deploy.sh` ship logs from every role to Loki on the monitor instance. |
 | `AWS_PROFILE`, `AWS_REGION` | AWS CLI defaults | Account and region to act on. |
 
 ## Useful one-liners
